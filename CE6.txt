@@ -1,0 +1,39 @@
+/configure system name CE6
+
+/configure port 1/1/1 no shutdown
+
+/configure router interface to-PE2
+address 192.168.6.6/24
+port 1/1/1
+no shutdown
+
+/configure router interface system
+address 192.168.0.6/32
+
+##BGP##
+/configure router autonomous-system 64497
+/configure router bgp group "PE-ASBR"
+local-as 64497
+peer-as 64502
+neighbor 192.168.6.2
+exit all
+
+##ADVERTISE SYSTEM IP##
+/configure router policy-options
+begin
+prefix-list "SYSTEM-IP" prefix 192.168.0.6/32 exact
+policy-statement "ADV-SYSTEM-IP"
+entry 10
+from prefix-list "SYSTEM-IP"
+action accept
+exit
+exit
+exit
+commit
+
+/configure router bgp group "PE-ASBR" export "ADV-SYSTEM-IP"
+
+#######################################################################
+#######################################################################
+
+ping 192.168.0.5 source 192.168.0.6

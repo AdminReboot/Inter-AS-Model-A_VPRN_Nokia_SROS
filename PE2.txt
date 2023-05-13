@@ -1,0 +1,78 @@
+/configure system name PE2
+
+/configure port 1/1/1 no shutdown
+
+/configure router interface system
+address 10.10.10.2/32
+
+/configure router interface to-ASBR4
+port 1/1/1
+address 10.2.4.2/24
+no shutdown
+
+##OSPF##
+/configure router ospf are 0
+interface to-ASBR4 interface-type point-to-point
+interface system
+/configure router ospf no shutdown
+
+##LDP##
+/configure router ldp interface-parameters interface to-ASBR4
+
+##BGP##
+/configure router autonomous-system 64502
+/configure router bgp group "PE-ASBR"
+family vpn-ipv4
+local-as 64502
+peer-as 64502
+neighbor 10.10.10.4
+
+##ACCESS PORT TO CE##
+/configure port 1/1/2
+ethernet mode access
+no shutdown
+
+##VPRN##
+/configure service vprn 10 customer 1 create
+autonomous-system 64502
+route-distinguisher 64502:10
+vrf-target target:64502:10
+auto-bind-tunnel resolution filter
+auto-bind-tunnel resolution-filter ldp
+interface to-CE6 create
+address 192.168.6.2/24
+sap 1/1/2 create
+
+/configure service vprn 10 bgp
+group PE-CE
+local-as 64502
+peer-as 64497
+neighbor 192.168.6.6
+exit all
+
+/configure service vprn 10 no shutdown
+
+#######################################################################
+#######################################################################
+
+#show router bgp routes 192.168.0.5/32 vpn-ipv4 detail 
+
+
+##EXPORT BGP VPN to BGP##
+/configure router policy-options
+begin
+policy-statement "EXPORT-TO-CE"
+entry 10
+from protocol bgp-vpn
+to protocol bgp
+action accept
+exit
+exit
+exit
+commit
+
+/configure service vprn 10 bgp group "PE-CE" export "EXPORT-TO-CE"
+
+
+#show router 10 fib 1 192.168.0.5/32
+#show router ldp bindings prefixes ipv4 session 10.10.10.4:0

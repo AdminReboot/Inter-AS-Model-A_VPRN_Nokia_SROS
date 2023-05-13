@@ -1,0 +1,89 @@
+/configure system name ASBR4
+
+/configure port 1/1/2 no shutdown
+
+/configure router interface system
+address 10.10.10.4/32
+
+/configure router interface to-PE2
+port 1/1/2
+address 10.2.4.4/24
+no shutdown
+
+##OSPF##
+/configure router ospf are 0
+interface to-PE2 interface-type point-to-point
+interface system
+/configure router ospf no shutdown
+
+##LDP##
+/configure router ldp interface-parameters interface to-PE2
+
+##BGP##
+/configure router autonomous-system 64502
+/configure router bgp group "PE-ASBR"
+family vpn-ipv4
+local-as 64502
+peer-as 64502
+neighbor 10.10.10.2
+
+#######################################################################
+#######################################################################
+
+##Configure VPRN 10 on ASBR4. Use RD and RT 64501:10
+/configure service vprn 10 customer 1 create
+autonomous-system 64502
+route-distinguisher 64502:10
+auto-bind-tunnel resolution filter
+auto-bind-tunnel resolution-filter ldp
+vrf-target target:64502:10
+no shutdown
+
+#show router 10 route-table
+
+##Configure a SAP toward ASBR3 on ASBR4’s VPRN using a VLAN tag of 10 and an IP address of 172.16.4.4/29.
+
+/configure port 1/1/1
+ethernet mode access
+ethernet encap-type dot1q
+no shutdown
+
+/configure service vprn 10
+interface to-ASBR3 create
+address 172.16.4.4/29
+sap 1/1/1:10 create
+
+
+##Configure an eBGP session between ASBR3 and ASBR4 over the VPRN 10 interface. ASBR4 must advertise only the system address of CE6 to ASBR3.
+/configure router policy-options
+begin
+prefix-list "VPN10_LOCAL_CE" prefix 192.168.0.6/32 exact
+policy-statement "VPN10_EXPORT"
+entry 10
+from protocol bgp-vpn
+from prefix-list "VPN10_LOCAL_CE"
+action accept
+exit
+exit
+default-action reject
+exit
+commit
+
+/configure service vprn 10 bgp
+group "to-ASBR3"
+neighbor 172.16.4.3
+export "VPN10_EXPORT"
+peer-as 64501
+
+
+#show router bgp neighbor 10.10.10.2 advertised-routes vpn-ipv4
+
+#show router 10 fib 1 192.168.0.5/32 
+
+
+
+
+
+
+
+

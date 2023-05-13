@@ -1,0 +1,83 @@
+/configure system name PE1
+
+/configure port 1/1/1 no shutdown
+
+/configure router interface system
+address 10.10.10.1/32
+
+/configure router interface to-ASBR3
+port 1/1/1
+address 10.1.3.1/24
+no shutdown
+
+##OSPF##
+/configure router ospf are 0
+interface to-ASBR3 interface-type point-to-point
+interface system
+/configure router ospf no shutdown
+
+
+##LDP##
+/configure router ldp interface-parameters interface to-ASBR3
+
+##BGP##
+/configure router autonomous-system 64501
+/configure router bgp group "PE-ASBR"
+family vpn-ipv4
+local-as 64501
+peer-as 64501
+neighbor 10.10.10.3
+
+##ACCESS PORT TO CE##
+/configure port 1/1/2
+ethernet mode access
+no shutdown
+
+##VPRN##
+/configure service vprn 10 customer 1 create
+autonomous-system 64501
+route-distinguisher 64501:10
+vrf-target target:64501:10
+auto-bind-tunnel resolution filter
+auto-bind-tunnel resolution-filter ldp
+interface to-CE5 create
+address 192.168.5.1/24
+sap 1/1/2 create
+
+/configure service vprn 10 bgp
+group PE-CE
+local-as 64501
+peer-as 64496
+neighbor 192.168.5.5
+exit all
+
+/configure service vprn 10 no shutdown
+
+
+#######################################################################
+#######################################################################
+
+##EXPORT BGP VPN to BGP##
+/configure router policy-options
+begin
+policy-statement "EXPORT-TO-CE"
+entry 10
+from protocol bgp-vpn
+to protocol bgp
+action accept
+exit
+exit
+exit
+commit
+
+/configure service vprn 10 bgp group "PE-CE" export "EXPORT-TO-CE"
+
+
+
+
+
+
+
+
+
+

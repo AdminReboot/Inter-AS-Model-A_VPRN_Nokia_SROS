@@ -1,0 +1,87 @@
+/configure system name ASBR3
+
+/configure port 1/1/2 no shutdown
+
+/configure router interface system
+address 10.10.10.3/32
+
+/configure router interface to-PE1
+port 1/1/2
+address 10.1.3.3/24
+no shutdown
+
+##OSPF##
+/configure router ospf are 0
+interface to-PE1 interface-type point-to-point
+interface system
+/configure router ospf no shutdown
+
+##LDP##
+/configure router ldp interface-parameters interface to-PE1
+
+##BGP##
+/configure router autonomous-system 64501
+/configure router bgp group "PE-ASBR"
+family vpn-ipv4
+local-as 64501
+peer-as 64501
+neighbor 10.10.10.1
+
+#######################################################################
+#######################################################################
+
+##Configure VPRN 10 on ASBR3. Use RD and RT 64501:10
+/configure service vprn 10 customer 1 create
+autonomous-system 64501
+route-distinguisher 64501:10
+auto-bind-tunnel resolution filter
+auto-bind-tunnel resolution-filter ldp
+vrf-target target:64501:10
+no shutdown
+
+#show router 10 route-table
+
+##Configure a SAP toward ASBR4 on ASBR3’s VPRN using a VLAN tag of 10 and an IP address of 172.16.4.3/29.
+
+/configure port 1/1/1
+ethernet mode access
+ethernet encap-type dot1q
+no shutdown
+
+/configure service vprn 10
+interface to-ASBR4 create
+address 172.16.4.3/29
+sap 1/1/1:10 create
+
+##Configure an eBGP session between ASBR3 and ASBR4 over the VPRN 10 interface. ASBR3 must advertise only the system address of CE5 to ASBR4. 
+/configure router policy-options
+begin
+prefix-list "VPN10_LOCAL_CE" prefix 192.168.0.5/32 exact
+policy-statement "VPN10_EXPORT"
+entry 10
+from protocol bgp-vpn
+from prefix-list "VPN10_LOCAL_CE"
+action accept
+exit
+exit
+default-action reject
+exit
+commit
+
+/configure service vprn 10 bgp
+group "to-ASBR4"
+neighbor 172.16.4.4
+export "VPN10_EXPORT"
+peer-as 64502
+
+#show router 10 bgp summary
+#show router 10 bgp neighbor 172.16.4.4 advertised-routes
+
+
+#show router 10 fib 1 192.168.0.5/32 
+#show router ldp bindings prefixes ipv4 session 10.10.10.1:0 
+
+
+
+
+
